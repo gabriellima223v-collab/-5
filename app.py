@@ -73,6 +73,7 @@ def index():
     <head>
         <meta charset="UTF-8">
         <title>Consulta Estoques</title>
+        <meta http-equiv="refresh" content="60"> <!-- Atualiza a cada 1 min -->
         <style>
             body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #1f4037, #99f2c8); margin: 0; padding: 20px; color: #333; }
             h1 { text-align: center; color: #fff; margin-bottom: 20px; }
@@ -104,7 +105,7 @@ def index():
             <button type="submit" formaction="/exportar">Exportar Excel</button>
         </form>
         <table>
-            <tr><th>Código</th><th>Nome</th><th>Disponível</th><th>Origem</th></tr>
+            <tr><th>Código</th><th>Nome</th><th>Disponível (H)</th><th>Origem</th></tr>
             {% for d in dados %}
             <tr>
                 <td>{{ d.codigo }}</td>
