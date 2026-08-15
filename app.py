@@ -105,7 +105,7 @@ def index():
             <button type="submit" formaction="/exportar">Exportar Excel</button>
         </form>
         <table>
-            <tr><th>Código</th><th>Nome</th><th>Disponível (H)</th><th>Origem</th></tr>
+            <tr><th>Código</th><th>Nome</th><th>Disponível</th><th>Origem</th></tr>
             {% for d in dados %}
             <tr>
                 <td>{{ d.codigo }}</td>
