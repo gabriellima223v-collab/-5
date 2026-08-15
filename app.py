@@ -15,16 +15,25 @@ arquivos_cds = {
     "CENTRO": os.path.join(base_path, "CD6.xlsx")
 }
 
-def carregar_dados():
+def carregar_dados(origem=None, limite=5000):
     dados = []
-    for origem, caminho in arquivos_cds.items():
+    # Se origem foi escolhida, carrega só essa planilha
+    if origem and origem in arquivos_cds:
+        caminhos = {origem: arquivos_cds[origem]}
+    else:
+        # Se não escolher origem, carrega todas (mais pesado)
+        caminhos = arquivos_cds
+
+    for origem, caminho in caminhos.items():
         if os.path.exists(caminho):
-            wb = load_workbook(caminho)
+            wb = load_workbook(caminho, read_only=True, data_only=True)
             sheet = wb.active
-            for row in sheet.iter_rows(min_row=2, values_only=True):
+            for i, row in enumerate(sheet.iter_rows(min_row=2, values_only=True)):
+                if i >= limite:  # limite de linhas para não estourar memória
+                    break
                 codigo = row[0]       # Coluna A
                 nome = row[1]         # Coluna B
-                qtd_disponivel = row[7]  # Coluna H
+                qtd_disponivel = row[9]  # Coluna J
                 if codigo and nome:
                     dados.append({
                         "codigo": str(codigo),
@@ -32,6 +41,7 @@ def carregar_dados():
                         "disponivel": qtd_disponivel,
                         "origem": origem
                     })
+            wb.close()
     return dados
 
 def aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem):
@@ -43,8 +53,6 @@ def aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem):
         dados = [d for d in dados if d["disponivel"] is not None and d["disponivel"] >= int(qtd_min)]
     if qtd_max:
         dados = [d for d in dados if d["disponivel"] is not None and d["disponivel"] <= int(qtd_max)]
-    if origem:
-        dados = [d for d in dados if d["origem"].lower() == origem.lower()]
     return dados
 
 @app.route("/")
@@ -55,7 +63,7 @@ def index():
     qtd_max = request.args.get("qtd_max")
     origem = request.args.get("origem")
 
-    dados = carregar_dados()
+    dados = carregar_dados(origem)
     dados = aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem)
 
     html = """
@@ -65,72 +73,16 @@ def index():
         <meta charset="UTF-8">
         <title>Consulta Estoques</title>
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #1f4037, #99f2c8);
-                margin: 0;
-                padding: 20px;
-                color: #333;
-            }
-            h1 {
-                text-align: center;
-                color: #fff;
-                margin-bottom: 20px;
-            }
-            form {
-                background: #fff;
-                padding: 15px;
-                border-radius: 8px;
-                margin-bottom: 20px;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-                justify-content: center;
-            }
-            form input[type="text"],
-            form input[type="number"],
-            form select {
-                padding: 8px;
-                border: 1px solid #ccc;
-                border-radius: 6px;
-            }
-            form input[type="submit"],
-            form button {
-                background: #1f4037;
-                color: #fff;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                cursor: pointer;
-                transition: 0.3s;
-            }
-            form input[type="submit"]:hover,
-            form button:hover {
-                background: #0d2c22;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                background: #fff;
-                border-radius: 8px;
-                overflow: hidden;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            }
-            th {
-                background: #1f4037;
-                color: #fff;
-                padding: 12px;
-                text-align: center;
-            }
-            td {
-                padding: 10px;
-                text-align: center;
-                border-bottom: 1px solid #ddd;
-            }
-            tr:hover {
-                background: #f2f2f2;
-            }
+            body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #1f4037, #99f2c8); margin: 0; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #fff; margin-bottom: 20px; }
+            form { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+            form input, form select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+            form input[type="submit"], form button { background: #1f4037; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+            form input[type="submit"]:hover, form button:hover { background: #0d2c22; }
+            table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+            th { background: #1f4037; color: #fff; padding: 12px; text-align: center; }
+            td { padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
+            tr:hover { background: #f2f2f2; }
         </style>
     </head>
     <body>
@@ -143,12 +95,9 @@ def index():
             Origem:
             <select name="origem">
                 <option value=""></option>
-                <option value="HUB" {% if request.args.get('origem')=='HUB' %}selected{% endif %}>HUB</option>
-                <option value="DUTRA" {% if request.args.get('origem')=='DUTRA' %}selected{% endif %}>DUTRA</option>
-                <option value="JAÇANA" {% if request.args.get('origem')=='JAÇANA' %}selected{% endif %}>JAÇANA</option>
-                <option value="LESTE" {% if request.args.get('origem')=='LESTE' %}selected{% endif %}>LESTE</option>
-                <option value="JABAQUARA" {% if request.args.get('origem')=='JABAQUARA' %}selected{% endif %}>JABAQUARA</option>
-                <option value="CENTRO" {% if request.args.get('origem')=='CENTRO' %}selected{% endif %}>CENTRO</option>
+                {% for origem in ['HUB','DUTRA','JACANA','LESTE','JABAQUARA','CENTRO'] %}
+                <option value="{{ origem }}" {% if request.args.get('origem')==origem %}selected{% endif %}>{{ origem }}</option>
+                {% endfor %}
             </select>
             <input type="submit" value="Filtrar">
             <button type="submit" formaction="/exportar">Exportar Excel</button>
@@ -177,22 +126,16 @@ def exportar():
     qtd_max = request.args.get("qtd_max")
     origem = request.args.get("origem")
 
-    dados = carregar_dados()
+    dados = carregar_dados(origem)
     dados = aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem)
 
-    # Criar workbook Excel
     wb = Workbook()
     ws = wb.active
     ws.title = "Estoques Filtrados"
-
-    # Cabeçalho
     ws.append(["Código", "Nome", "Disponível", "Origem"])
-
-    # Dados
     for d in dados:
         ws.append([d["codigo"], d["nome"], d["disponivel"], d["origem"]])
 
-    # Salvar em memória
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
