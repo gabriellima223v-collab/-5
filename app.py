@@ -15,7 +15,7 @@ arquivos_cds = {
     "CENTRO": os.path.join(base_path, "CD6.xlsx")
 }
 
-def carregar_dados(origem=None, codigo=None, nome=None, qtd_min=None, qtd_max=None, limite=5000):
+def carregar_dados(origem=None, codigo=None, nome=None, qtd_min=None, qtd_max=None, limite=3000):
     dados = []
     if origem and origem in arquivos_cds:
         caminhos = {origem: arquivos_cds[origem]}
@@ -29,11 +29,13 @@ def carregar_dados(origem=None, codigo=None, nome=None, qtd_min=None, qtd_max=No
             for i, row in enumerate(sheet.iter_rows(min_row=2, values_only=True)):
                 if i >= limite:
                     break
-                codigo_val = row[0]
-                nome_val = row[1]
-                qtd_disponivel = row[9]  # Coluna J
 
-                if not codigo_val or not nome_val:
+                codigo_val = row[0]   # Coluna A
+                nome_val = row[1]     # Coluna B
+                qtd_h = row[7]        # Coluna H
+
+                # só aceita linhas com informação nas 3 colunas
+                if not (codigo_val and nome_val and qtd_h is not None):
                     continue
 
                 # aplica filtros já na leitura
@@ -41,15 +43,15 @@ def carregar_dados(origem=None, codigo=None, nome=None, qtd_min=None, qtd_max=No
                     continue
                 if nome and nome.lower() not in str(nome_val).lower():
                     continue
-                if qtd_min and (qtd_disponivel is None or qtd_disponivel < int(qtd_min)):
+                if qtd_min and (qtd_h < int(qtd_min)):
                     continue
-                if qtd_max and (qtd_disponivel is None or qtd_disponivel > int(qtd_max)):
+                if qtd_max and (qtd_h > int(qtd_max)):
                     continue
 
                 dados.append({
                     "codigo": str(codigo_val),
                     "nome": nome_val,
-                    "disponivel": qtd_disponivel,
+                    "disponivel": qtd_h,
                     "origem": origem
                 })
             wb.close()
@@ -102,7 +104,7 @@ def index():
             <button type="submit" formaction="/exportar">Exportar Excel</button>
         </form>
         <table>
-            <tr><th>Código</th><th>Nome</th><th>Disponível</th><th>Origem</th></tr>
+            <tr><th>Código</th><th>Nome</th><th>Disponível (H)</th><th>Origem</th></tr>
             {% for d in dados %}
             <tr>
                 <td>{{ d.codigo }}</td>
@@ -130,7 +132,7 @@ def exportar():
     wb = Workbook()
     ws = wb.active
     ws.title = "Estoques Filtrados"
-    ws.append(["Código", "Nome", "Disponível", "Origem"])
+    ws.append(["Código", "Nome", "Disponível (H)", "Origem"])
     for d in dados:
         ws.append([d["codigo"], d["nome"], d["disponivel"], d["origem"]])
 
