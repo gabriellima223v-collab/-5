@@ -15,13 +15,11 @@ arquivos_cds = {
     "CENTRO": os.path.join(base_path, "CD6.xlsx")
 }
 
-def carregar_dados(origem=None, limite=5000):
+def carregar_dados(origem=None, codigo=None, nome=None, qtd_min=None, qtd_max=None, limite=5000):
     dados = []
-    # Se origem foi escolhida, carrega só essa planilha
     if origem and origem in arquivos_cds:
         caminhos = {origem: arquivos_cds[origem]}
     else:
-        # Se não escolher origem, carrega todas (mais pesado)
         caminhos = arquivos_cds
 
     for origem, caminho in caminhos.items():
@@ -29,30 +27,32 @@ def carregar_dados(origem=None, limite=5000):
             wb = load_workbook(caminho, read_only=True, data_only=True)
             sheet = wb.active
             for i, row in enumerate(sheet.iter_rows(min_row=2, values_only=True)):
-                if i >= limite:  # limite de linhas para não estourar memória
+                if i >= limite:
                     break
-                codigo = row[0]       # Coluna A
-                nome = row[1]         # Coluna B
+                codigo_val = row[0]
+                nome_val = row[1]
                 qtd_disponivel = row[9]  # Coluna J
-                if codigo and nome:
-                    dados.append({
-                        "codigo": str(codigo),
-                        "nome": nome,
-                        "disponivel": qtd_disponivel,
-                        "origem": origem
-                    })
-            wb.close()
-    return dados
 
-def aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem):
-    if codigo:
-        dados = [d for d in dados if d["codigo"] == codigo]
-    if nome:
-        dados = [d for d in dados if nome.lower() in d["nome"].lower()]
-    if qtd_min:
-        dados = [d for d in dados if d["disponivel"] is not None and d["disponivel"] >= int(qtd_min)]
-    if qtd_max:
-        dados = [d for d in dados if d["disponivel"] is not None and d["disponivel"] <= int(qtd_max)]
+                if not codigo_val or not nome_val:
+                    continue
+
+                # aplica filtros já na leitura
+                if codigo and str(codigo_val) != codigo:
+                    continue
+                if nome and nome.lower() not in str(nome_val).lower():
+                    continue
+                if qtd_min and (qtd_disponivel is None or qtd_disponivel < int(qtd_min)):
+                    continue
+                if qtd_max and (qtd_disponivel is None or qtd_disponivel > int(qtd_max)):
+                    continue
+
+                dados.append({
+                    "codigo": str(codigo_val),
+                    "nome": nome_val,
+                    "disponivel": qtd_disponivel,
+                    "origem": origem
+                })
+            wb.close()
     return dados
 
 @app.route("/")
@@ -63,8 +63,7 @@ def index():
     qtd_max = request.args.get("qtd_max")
     origem = request.args.get("origem")
 
-    dados = carregar_dados(origem)
-    dados = aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem)
+    dados = carregar_dados(origem, codigo, nome, qtd_min, qtd_max)
 
     html = """
     <!DOCTYPE html>
@@ -126,8 +125,7 @@ def exportar():
     qtd_max = request.args.get("qtd_max")
     origem = request.args.get("origem")
 
-    dados = carregar_dados(origem)
-    dados = aplicar_filtros(dados, codigo, nome, qtd_min, qtd_max, origem)
+    dados = carregar_dados(origem, codigo, nome, qtd_min, qtd_max)
 
     wb = Workbook()
     ws = wb.active
